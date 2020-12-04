@@ -29,6 +29,7 @@ import {mobileNetSavedModel, resNet50SavedModel} from './saved_models';
 import {BodyPixArchitecture, BodyPixInput, BodyPixInternalResolution, BodyPixMultiplier, BodyPixOutputStride, BodyPixQuantBytes, Padding} from './types';
 import {PartSegmentation, PersonSegmentation, SemanticPartSegmentation, SemanticPersonSegmentation} from './types';
 import {getInputSize, padAndResizeTo, scaleAndCropToInputTensorShape, scaleAndFlipPoses, toInputResolutionHeightAndWidth, toTensorBuffers3D} from './util';
+import { IOHandler } from '@tensorflow/tfjs-core/dist/io/types';
 
 const APPLY_SIGMOID_ACTIVATION = true;
 const FLIP_POSES_AFTER_SCALING = false;
@@ -68,6 +69,7 @@ export interface ModelConfig {
   multiplier?: BodyPixMultiplier;
   modelUrl?: string;
   quantBytes?: BodyPixQuantBytes;
+  modelLoader?: IOHandler
 }
 
 // The default configuration for loading MobileNetV1 based BodyPix.
@@ -141,7 +143,13 @@ function validateModelConfig(config: ModelConfig): ModelConfig {
         `Should be one of ${VALID_QUANT_BYTES} ` +
         `for architecture ${config.architecture}.`);
   }
-
+  if (config.modelUrl && config.modelLoader) {
+    throw new Error(
+      `Invalid model config. ` +
+        `Both modelUrl${config.modelUrl} and modelLoader:${config.modelLoader}. ` +
+        `Only one of modelUrl and modelLoader must be provided. `
+    );
+  }
   return config;
 }
 
@@ -994,7 +1002,8 @@ async function loadMobileNet(config: ModelConfig): Promise<BodyPix> {
   }
 
   const url = mobileNetSavedModel(outputStride, multiplier, quantBytes);
-  const graphModel = await tfconv.loadGraphModel(config.modelUrl || url);
+  const graphModel = await tfconv.loadGraphModel(
+    config.modelLoader|| config.modelUrl || url);
   const mobilenet = new MobileNet(graphModel, outputStride);
   return new BodyPix(mobilenet);
 }
@@ -1013,7 +1022,8 @@ async function loadResNet(config: ModelConfig): Promise<BodyPix> {
   }
 
   const url = resNet50SavedModel(outputStride, quantBytes);
-  const graphModel = await tfconv.loadGraphModel(config.modelUrl || url);
+  const graphModel = await tfconv.loadGraphModel(
+    config.modelLoader|| config.modelUrl || url);
   const resnet = new ResNet(graphModel, outputStride);
   return new BodyPix(resnet);
 }
